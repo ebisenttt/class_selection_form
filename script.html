@@ -1,0 +1,288 @@
+<script>
+  let groupData;
+  let subjectData;
+  let classData;
+  const creditMax = 23;
+
+  google.script.run
+    .withSuccessHandler(e => {
+      $('#progress-reading-data').hide();
+      groupData = e.groupData;
+      subjectData = e.subjectData;
+      classData = e.classData;
+      // console.log(groupData, subjectData, classData);
+      addGroupDom(groupData);
+      addSubjectDom(subjectData);
+      addClassDom(classData)
+    })
+    .getDataList()
+
+  //GroupのDOMを追加
+  function addGroupDom(group){
+    $.each(group, function(index, element){
+      const box = $('<div>', {class: 'field box'});
+      const title = $('<label>', {class: 'label group', id: element.id, text: element.text});
+      const errorMessageWrapper = $('<p>', {class: 'help is-danger error-message'});
+      $(errorMessageWrapper).appendTo(title);
+      $(title).appendTo(box);
+      //提出ボタンの前に挿入
+      $('#submit-button').before(box);
+    })
+  }
+  
+  //教科のDOMを追加
+  function addSubjectDom(subject){
+    $.each(subject, function(index, element){
+      const field = $('<div>', {class: 'field'})
+      const label = $('<label>', {class: 'label subject', id: element.id, text: element.text});
+      const control = $('<div>', {class: 'control'});
+      const errorMessageWrapper = $('<p>', {class: 'help is-danger error-message'});
+      $(errorMessageWrapper).appendTo(label);
+      $(label).appendTo(field);
+      $(control).appendTo(field);
+      const target = $(`#${element.groupId}`).parent();
+      $(field).appendTo(target);
+    })
+  }
+
+  //科目のDOMを追加
+  function addClassDom(classList) {
+    $.each(classList, function(index, element){
+      const input = $('<input>',{type: element.type,value: element.credit, name: element.subjectId});
+      const label = $('<label>', {class: 'checkbox class', id: element.id, text: element.text});
+      // const errorMessageWrapper = $('<p>', {class: 'help is-danger error-message'});
+      const description = $('<p>', {class: 'help description', text: element.description});
+      $(input).prependTo(label);
+      $(description).appendTo(label)
+      const target = $(`#${element.subjectId}`).parent().find('.control');
+      $(label).appendTo(target);
+      // $(description).appendTo(target);
+      // $(errorMessageWrapper).appendTo(target);
+    })
+  }
+
+  //科目選択時の処理
+  $('body').on('click','input', function(){
+    //科目名のカウント
+    const creditSum = getCreditSum();
+    const counterText = $('#credit-counter');
+    counterText.removeClass();
+    let color;
+    if(creditSum < creditMax) color = 'has-text-info';
+    else if(creditSum === creditMax) color = 'has-text-success';
+    else color = 'has-text-danger';
+    $(counterText).addClass(color);
+    $('#credit-counter').text(creditSum + ' / ' + creditMax);
+  })
+
+  //提出ボタン押下時の処理
+  $('form').submit('click', function() {
+    //番号の取得
+    const number = $('#number-input').val();
+    // console.log(number);
+    //選択科目の取得
+    let selection = new Object();
+    let creditSum = 0;
+    $('input[type=checkbox], input[type=radio]').each(function() {
+      const checked = $(this).prop('checked');
+      const classId = $(this).parent().attr('id');
+      const subjectId = $(this).closest('.field').find('.subject').attr('id');
+      const groupId = $(this).closest('.box').find('.group').attr('id');
+      // console.log(groupId, subjectId, classId, checked);
+      if(!(groupId in selection))selection[groupId] = {};
+      if(!(subjectId in selection[groupId])) selection[groupId][subjectId] = {};
+      selection = {
+        ...selection,
+        [groupId]:{
+          ...selection[groupId],
+          [subjectId]: {
+            ...selection[groupId][subjectId],
+            [classId]: checked
+          }
+        }
+      }
+      if(checked){
+        creditSum += $(this).val();
+      } 
+    });
+    // console.log('selection', selection);
+    resetErrorMessage();
+    const isValid = validateNumber(number)
+      && validateCreditSum(creditSum)
+      && validateClassMinMax(selection)
+      && validateSubjectMinMax(selection)
+      && validateCombo(selection);
+    if(isValid){
+      const classList = $('#classList');
+      $.each(selection, function(key_group, obj_group){
+        $.each(obj_group, function(key_subject, obj_subject) {
+          $.each(obj_subject, function(key_class, boolean_class) {
+            if(boolean_class){
+              const className = getClassText(key_class);
+              $(`<p>${className}</p>`).appendTo(classList);
+            }
+          })
+        })
+      })
+      showConfirmModal();
+    }
+  })
+
+  //選択済み単位数の取得
+  function getCreditSum() {
+    let creditSum = 0;
+    $('input:checked').each(function() {
+      creditSum += Number($(this).val());
+    });
+    return creditSum;
+  }
+
+  //以下Validation
+  //学籍番号
+  function validateNumber(number) {
+    // console.log(number);
+    const isValid = (1000 < number && number < 3999);
+    if(!isValid)$('#number').parent().find('.error-message').text('学籍番号に誤りがあります。');
+    return isValid;
+  }
+
+  function validateCreditSum() {
+    return getCreditSum() === 23;
+  }
+
+  //科目の最小選択数，最大選択数を確認
+  function validateClassMinMax(selection) {
+    let isValid = true;
+    $.each(subjectData, function(index, subject){
+      const groupId = subject.groupId;
+      const subjectId = subject.id;
+      const max = subject.max;
+      const min = subject.min;
+      const selectedClassList = selection[groupId][subjectId];
+      const selectedClassListKeys = Object.keys(selectedClassList);
+      const selectedClassCnt = selectedClassListKeys.filter(key => selectedClassList[key] === true).length;
+      const errorMessageWrapper = $(`#${subjectId}`).children('.error-message');
+      // console.log(subjectId, selectedClassCnt);
+      if(selectedClassCnt < min || max < selectedClassCnt){
+        isValid = false;
+        const errorMessage = min === max ? `${min}講座選択して下さい。` : `${min}講座から${max}講座選択して下さい。`;
+        $(errorMessageWrapper).text(errorMessage);
+      } else {
+        $(errorMessageWrapper).text('');
+      }
+    });
+    return isValid;
+  };
+
+
+  //教科の最小選択数，最大選択数を確認
+  function validateSubjectMinMax(selection) {
+    let isValid = true;
+    $.each(groupData, function(index, group) {
+      const groupId = group.id;
+      const min = group.min;
+      const max = group.max;
+      // console.log(groupId, min, max);
+      let selectedClassCnt = 0;
+      const subjectList = selection[groupId];
+      Object.keys(subjectList).map(subjectId => {
+        Object.keys(selection[groupId][subjectId]).map(classId => {
+          if(selection[groupId][subjectId][classId])selectedClassCnt += 1;
+        })
+      });
+      // console.log(groupId, 'selectedClassCnt', selectedClassCnt);
+      const errorMessageWrapper = $(`#${groupId}`).children('.error-message');
+      if(selectedClassCnt < min || max < selectedClassCnt){
+        isValid = false;
+        const errorMessage = min === max ? `${min}講座選択して下さい。` : `${min}講座から${max}講座選択して下さい。`;
+        $(errorMessageWrapper).text(errorMessage);
+      } else {
+        $(errorMessageWrapper).text('');
+      }
+    })
+    return isValid;
+  }
+
+  //同時に履修しなければいけない科目を確認
+  function validateCombo(selection) {
+    let isValid = true;
+    // console.log(selection);
+    let classObj = {};
+    $.each(selection, function(i, group) {
+      $.each(group, function(j, subject) {
+        classObj = {...classObj, ...subject};
+      })
+    })
+    // console.log(classObj);
+    $.each(classData, function(index, cls){
+      const classId = cls.id;
+      const comboId = cls.combo;
+      const subjectId = cls.subjectId;
+      const errorMessageWrapper = $(`#${subjectId}`).children('.error-message');
+      // console.log(classId, comboId, subjectId);
+      //comboがある科目を選択しているのにcomboを選択していない場合
+      if(classObj[classId] && comboId !== '' && !(classObj[comboId])){
+        // console.log(classId, comboId);
+        isValid = false;
+        const comboObj = classData.filter(obj => obj.id === comboId)[0];
+        // console.log('comboObj', comboObj);
+        const errorMessage = `${cls.text}を履修するには${comboObj.text}も履修して下さい。`
+        // console.log(errorMessage);
+        $(errorMessageWrapper).text(errorMessage);
+      } else {
+        // $(errorMessageWrapper).text('');
+      }
+    });
+    return isValid;
+  }
+
+  //エラーメッセージのリセット
+  function resetErrorMessage() {
+    $('.error-message').text('');
+  }
+
+  //確認モーダルの表示
+  function showConfirmModal() {
+    $('#confirmModal').addClass('is-active');
+  }
+
+  //確認モーダルの非表示
+  function hideConfirmModal() {
+    $('#confirmModal').removeClass('is-active');
+  }
+
+  //ClassのIDからTEXTを取得
+  function getClassText(id) {
+    const classObj = classData.filter(cls => cls.id === id)[0];
+    return classObj.text;
+  }
+
+  //確認モーダルのキャンセルボタン押下時の処理
+  $("#confirmModal .cancel").on("click", function(){
+    hideConfirmModal();
+    $('#classList').text('');
+  });
+  
+  //確認モーダルの登録ボタン押下時の処理
+  $('#registerButton').on('click', function () {
+      $('#progress-bar').show();
+      const number = $("#number-input").val();
+      const selectedClassIdList = [];
+      $('input:checked').each(function(){
+        selectedClassIdList.push($(this).parent().attr('id'));
+      });
+      const data = {
+        "number": number,
+        "classes": selectedClassIdList
+      };
+      console.log(selectedClassIdList);
+      google.script.run
+      .withSuccessHandler(e => {
+        console.log(e);
+        $('#confirmModal').removeClass('is-active');
+        $('#successModal').addClass('is-active');
+      })
+      .doSubmitAjax(data);
+  });
+
+</script>

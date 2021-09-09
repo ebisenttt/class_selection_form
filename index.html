@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <!--jQuery-->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!--Font Awesome-->
+    <script src="https://use.fontawesome.com/releases/v5.3.1/js/all.js" defer></script>
+    <!--Bluma-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css" />
+    <?!=HtmlService.createHtmlOutputFromFile("resetCss").getContent();?>
+    <?!=HtmlService.createHtmlOutputFromFile("css").getContent();?>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1 class="title">新教育課程科目選択フォーム3年次</h1>
+      </header>
+      <main>
+        <!-- 単位数を表示するカード -->
+        <div id='fixed-nav' class='card'>
+          <div class='card-content'>
+            <div class='content'>
+              <p>選択済みの単位数</p>
+              <p id='credit-counter'>0 / 23</p>
+            </div>
+          </div>
+        </div>
+        <!-- フォーム -->
+        <form id='form' onsubmit='return false;'>
+          <div class='field box'>
+            <label id='number' class='label'>学籍番号4桁
+              <p class='help error-message is-danger'></p>
+            </label>
+            <div class='control'>
+              <input type="number" id="number-input">
+            </div>
+            <p class="help">1年2組3番の場合「1203」</p>
+          </div>
+          <!-- ここに挿入される -->
+          <progress id='progress-reading-data' class='progress is-success'></progress>
+          <div id="submit-button">
+            <input type="submit" class="button is-primary" value="送信">
+          </div>
+          <div>
+            <div id="message-error" class=""></div>
+          </div>
+        </form>
+        <!-- モーダル -->
+        <div class="modal" id="confirmModal">
+          <div class="modal-background"></div>
+          <div class="modal-card">
+            <div class="modal-card-head">
+              <p class="mordal-card-title">選択科目の確認</p>           
+            </div>
+            <section class="modal-card-body">
+              <div id="classList">
+              </div>
+            </section>
+            <footer class="modal-card-foot">
+              <button type="button" id="registerButton" class="button is-success">登録</button>
+              <button type="button" class="button cancel">キャンセル</button>
+              <progress class="progress is-small is-primary progress-bar" max="100" id="progress-bar"></progress>
+            </footer>
+          </div>
+        </div>
+        <div class="modal" id="successModal">
+          <div class="modal-background"></div>
+          <div class="modal-card">
+            <div class="modal-card-head">
+              <p class="modal-card-title">登録完了</p>
+            </div>
+            <section class="modal-card-body">
+              <div id="successMessage">
+                登録が完了しました。ご協力ありがとうございました。このタブを閉じて終了して下さい。
+              </div>
+            </section>
+            <footer class="modal-card-foot">
+            </footer>
+          </div>
+        </div>
+      </main>
+      <?!=HtmlService.createHtmlOutputFromFile("script").getContent();?>
+    </div>
+  </body>
+</html>

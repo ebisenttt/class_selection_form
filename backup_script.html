@@ -1,0 +1,168 @@
+<script>
+
+  const SUBJECT_LIST = {
+    "science":{max: 2, credit: 4},
+    "geography-and-history":{max: 1, credit: 4},
+    "basic-science": {max: 2, credit: 2},
+    "art-1": {max: 1, credit: 2},
+    "art-2": {max: 1, credit: 2},
+    "second-language": {max: 1, credit: 2},
+    "others": {max: 3, credit: 2}
+  }
+
+  //選択すべき単位数
+  const MAX_CREDIT = 10;
+
+  //アラートメッセージ
+  const ALERT_MESSAGE_1 = "学籍番号は4桁の数字で入力して下さい。";
+  const ALERT_MESSAGE_2 = "4単位の講座を少なくとも1つ選択して下さい。";
+  const ALERT_MESSAGE_3 = "合計10単位になるように選択して下さい。";
+  const ALERT_MESSAGE_4 = "1つずつ選択して下さい。";
+
+  //チェックボックスクリック時の処理
+  $("input:checkbox").on('click', function(){
+    const name = $(this).attr("name");
+    const max = SUBJECT_LIST[name].max;
+    const boxes = $(`input[name="${name}"]`);
+    const count = boxes.filter(":checked").length;
+    console.log(name, count);
+    if(count == max){
+      const notChecked = boxes.filter(":not(:checked)");
+      console.log(notChecked);
+      notChecked.each(function(){
+        $(this).prop("disabled", true);
+      })
+    }else{
+      boxes.each(function(){
+        $(this).prop("disabled", false);
+      })
+    }
+  })
+
+  //送信ボタンクリック時の処理
+  $('form').submit("click", function(){
+    let creditSum = 0;
+    let checkedList = [];
+    //ラジオボタン
+    $("input:radio:checked").each(function(){
+      const subjectName = $(this).attr('name');
+      const className = $(this).val();
+      checkedList.push({"subjectName": subjectName, "className": className});
+    });
+    //チェックボックス
+    $("input:checkbox:checked").each(function(){
+      const subjectName = $(this).attr("name");
+      const credit = SUBJECT_LIST[subjectName].credit;
+      const className = $(this).val();
+      creditSum += credit;
+      checkedList.push({"subjectName": subjectName, "className": className});
+    });
+    //国語と数学が選択されているか
+    const isJapaneseAndMathSelected = checkedList.some(obj => (
+      obj.subjectName === 'japanese-and-math'
+    ))
+
+    const isGeographyHistoryAndCivicsSelected = checkedList.some(obj => (
+      obj.subjectName === 'geography-history-and-civics'
+    ))
+
+    //理科か地歴の講座が選択されているか
+    const isScineceAndGeographyAndHistorySelected = checkedList.some(obj => (
+      obj.subjectName === "science" || obj.subjectName === "geography-and-history"
+    ));
+    console.log(checkedList);
+
+    const number = $("#number").val();
+    let isError = false;
+    let isScrolled = false;
+    if(number <= 1100 || number >= 4000){
+      isError = true;
+      showErrorMessage("alert-1", ALERT_MESSAGE_1, isScrolled);
+      isScrolled = true;
+    } else {
+      hideErrorMessage('alert-1')
+    }
+    if(!isJapaneseAndMathSelected || !isGeographyHistoryAndCivicsSelected) {
+      isError = true;
+      showErrorMessage('alert-4', ALERT_MESSAGE_4, isScrolled);
+      isScrolled = true;
+    } else {
+      hideErrorMessage('alert-4');
+    }
+    if(!isScineceAndGeographyAndHistorySelected){
+      showErrorMessage('alert-2', ALERT_MESSAGE_2, isScrolled);
+      isError = true;
+      isScrolled = true;
+    } else {
+      hideErrorMessage('alert-2');
+    }
+    if(creditSum != MAX_CREDIT){
+      // alert(ALERT_MESSAGE_3);
+      // $('#alert-3').text(ALERT_MESSAGE_3);
+      showErrorMessage('alert-3', ALERT_MESSAGE_3, isScrolled);
+      isError = true;
+      isScrolled = true;
+    } else {
+      hideErrorMessage('alert-3');
+    }
+
+    function showErrorMessage(id, message, isScrolled){
+      id = '#' + id;
+      $(id).text(message);
+      console.log("check", id, message);
+      if(!isScrolled)$('html, body').animate({scrollTop: $(id).offset().top}, 500, 'swing');
+      $(id).show();
+    }
+
+    function hideErrorMessage(id) {
+      id = '#' + id;
+      $(id).hide();
+    }
+
+    if(!isError){
+      //jQueryで書きたい
+      let ul = document.createElement("ul");
+      checkedList.forEach(function(obj, index){
+        let li = document.createElement("li");
+        li.id = index;
+        li.textContent = obj.className;
+        ul.appendChild(li);
+      })
+      const classList = document.getElementById("classList");
+      const p = document.createElement("p");
+      p.textContent = "学籍番号: " + number;
+      classList.appendChild(p);
+      classList.appendChild(ul);
+      $("#confirmModal").show();
+    }
+  })
+
+  //モーダルのキャンセルボタンとXボタン
+  $("#confirmModal .cancel").on("click", function(){
+    $("#confirmModal").hide();
+    let list = document.getElementById("classList");
+    while(list.firstChild){
+      list.removeChild(list.firstChild);
+    }
+  });
+  
+  //確認モーダルの登録ボタンクリック時処理
+  $('#registerButton').on('click', function () {
+      $('#progress-bar').show();
+      const number = $("#number").val();
+      let classes = [];
+      $('input:checked').each(function () {
+          classes.push($(this).val());
+      });
+      const data = {
+        "number": number,
+        "classes": classes
+      };
+      google.script.run.withSuccessHandler(doSubmitSuccess).doSubmitAjax(data);
+  });
+  const doSubmitSuccess = function (result) {
+      //成功したときの画面処理を書く
+      $("#confirmModal").hide();
+      $("#successModal").show();
+  };
+</script>
